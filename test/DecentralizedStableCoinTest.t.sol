@@ -52,13 +52,19 @@ contract DecentralizedStableCoinTest is Test {
     function testShouldRevertMintCallWithoutOwner() external {
         vm.prank(alice);
         vm.expectRevert(abi.encodeWithSelector( Ownable.OwnableUnauthorizedAccount.selector,alice));
-        stableCoin.mint(alice);
+        stableCoin.mint(alice,1);
     }
 
     function testShouldNotMintToZeroAddress() external {
         vm.prank(owner);
         vm.expectRevert(DecentralizedStableCoin.DecentralizedStableCoin__CantMintToZeroAddress.selector);
-        stableCoin.mint(address(0));
+        stableCoin.mint(address(0),1);
+    }
+
+    function testShouldRevertMintingWithLessThanZeroAmount() external {
+        vm.prank(owner);
+        vm.expectRevert(DecentralizedStableCoin.DecentralizedStableCoin__CantMintWithZeroAmount.selector);
+        stableCoin.mint(alice,0);
     }
 
 }
