@@ -15,8 +15,23 @@ import {Ownable} from "../lib/openzeppelin-contracts/contracts/access/Ownable.so
  * This is the contract meant to be governed by DSCEngine. This contract is just the ERC20 implementation of our stablecoin system.
  */
 
+error DecentralizedStableCoin__MustBurnMoreThanZero();
+error DecentralizedStableCoin__MustBurnLessThanCurrentBalance();
+
 contract DecentralizedStableCoin is ERC20Burnable, Ownable {
     constructor(address initialOwner) Ownable(initialOwner) ERC20("DecentralizedStableCoin","DSC"){
 
+    }
+
+    function burn(uint256 _amount) public override onlyOwner{
+        if ( _amount <= 0){
+            revert DecentralizedStableCoin__MustBurnMoreThanZero();
+        }
+
+        uint256 balance = balanceOf(msg.sender);
+        if(balance < _amount){
+            revert DecentralizedStableCoin__MustBurnLessThanCurrentBalance();
+        }
+        super.burn(_amount);
     }
 }
