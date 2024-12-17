@@ -31,6 +31,7 @@ contract DecentralizedStableCoinTest is Test {
         assertEq(coinSymbol,actualCoinSymbol);
     }
 
+    // Tests for Burn function
     function testOnlyOwnerShouldBurn() external {
         uint256 amount = 1;
 
@@ -46,4 +47,12 @@ contract DecentralizedStableCoinTest is Test {
         vm.expectRevert(DecentralizedStableCoin.DecentralizedStableCoin__MustBurnMoreThanZero.selector);
         stableCoin.burn(amount);
     }
+
+    // Tests for Mint function
+    function testShouldRevertMintCallWithoutOwner() external {
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector( Ownable.OwnableUnauthorizedAccount.selector,alice));
+        stableCoin.mint();
+    }
+
 }
