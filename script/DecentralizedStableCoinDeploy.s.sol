@@ -8,10 +8,11 @@ import {DecentralizedStableCoin} from "../src/DecentralizedStableCoin.sol";
 contract DecentralizedStableCoinDeploy is Script {
     DecentralizedStableCoin private stableCoin;
     address private owner;
-    function run() public {
+    function run() public returns(DecentralizedStableCoin){
         owner = vm.parseAddress(vm.envString("OWNER_ADDRESS"));
         vm.startBroadcast();
         stableCoin = new DecentralizedStableCoin(owner);
         vm.stopBroadcast();
+        return stableCoin;
     }
 }
