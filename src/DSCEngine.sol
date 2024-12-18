@@ -36,6 +36,7 @@ contract DSCEngine is ReentrancyGuard {
     mapping(address token => address priceFeed) private s_tokenToPriceFeeds;
     mapping(address user => mapping(address token => uint256 amount)) private s_collateralDeposited;
     DecentralizedStableCoin private immutable i_dsc;
+    mapping(address user => uint256 amountDscMinted) private s_coinsMinted;
 
     event CollateralDeposited(address user, address tokenAddress, uint256 amount);
 
@@ -62,6 +63,7 @@ contract DSCEngine is ReentrancyGuard {
         i_dsc = DecentralizedStableCoin(dscAddress);
     }
 
+    // External & Public
     function depositCollateral(address tokenCollateralAddress, uint256 amountCollateral) external moreThanZero(amountCollateral) isValidCollateral(tokenCollateralAddress){
         s_collateralDeposited[msg.sender][tokenCollateralAddress] = amountCollateral;
         emit CollateralDeposited(msg.sender,tokenCollateralAddress,amountCollateral);
@@ -70,5 +72,10 @@ contract DSCEngine is ReentrancyGuard {
         if (!success) {
             revert DSCEngine__TransferFailed(msg.sender,address(this),amountCollateral);
         }
+    }
+    
+    // Internal & Private
+    function mintDSC(uint256 amountDSCToMint) public moreThanZero(amountDSCToMint) nonReentrant {
+        s_coinsMinted[msg.sender] += amountDSCToMint;
     }
 }
