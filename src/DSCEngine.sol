@@ -22,6 +22,27 @@ pragma solidity ^0.8.18;
  * @notice This contract is based on the MakerDAO DSS system
  */
 
-contract DSCEngine {
 
+contract DSCEngine {
+    error DSCEngine__NotaValidToken(address tokenCollateralAddress);
+    error DSCEngine__AmountShouldBePositive(uint256 amount);
+
+    mapping(address => address) private s_tokenToPriceFeeds;
+
+    modifier moreThanZero(uint256 amount) {
+        if(amount <= 0){
+            revert DSCEngine__AmountShouldBePositive(amount);
+        }
+        _;
+    }
+    modifier isValidCollateral(address tokenCollateralAddress) {
+        if (s_tokenToPriceFeeds[tokenCollateralAddress] == address(0)){
+            revert DSCEngine__NotaValidToken(tokenCollateralAddress);
+        }
+        _;
+    }
+
+    function depositCollateral(address tokenCollateralAddress, uint256 amountCollateral) external moreThanZero(amountCollateral) isValidCollateral(tokenCollateralAddress){
+        
+    }
 }
