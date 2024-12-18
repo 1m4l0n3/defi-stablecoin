@@ -37,7 +37,7 @@ contract DSCEngine is ReentrancyGuard {
     mapping(address token => address priceFeed) private s_tokenToPriceFeeds;
     mapping(address user => mapping(address token => uint256 amount)) private s_collateralDeposited;
     DecentralizedStableCoin private immutable i_dsc;
-    mapping(address user => uint256 amountDscMinted) private s_coinsMinted;
+    mapping(address user => uint256 amountDscMinted) private s_totalAmountMinted;
     address[] private s_collateralTokens;
     uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
     uint256 private constant PRECISION = 1e18;
@@ -69,9 +69,8 @@ contract DSCEngine is ReentrancyGuard {
     }
 
     // External & Public
-
-    function mintDSC(uint256 amountDSCToMint) public moreThanZero(amountDSCToMint) nonReentrant {
-        s_coinsMinted[msg.sender] += amountDSCToMint;
+    function mintDSC(uint256 amountToMint) public moreThanZero(amountToMint) nonReentrant {
+        s_totalAmountMinted[msg.sender] += amountToMint;
     }
 
     function depositCollateral(address tokenCollateralAddress, uint256 amountCollateral) external moreThanZero(amountCollateral) isValidCollateral(tokenCollateralAddress){
@@ -96,7 +95,7 @@ contract DSCEngine is ReentrancyGuard {
     }
 
     function _getAccountInformation(address user) internal view returns(uint256,uint256){
-        uint256 totalAmountMinted = s_coinsMinted[user];
+        uint256 totalAmountMinted = s_totalAmountMinted[user];
         uint256 totalCollateralValue = getAccountCollateralValue(user);
         return (totalAmountMinted,totalCollateralValue);
     }
