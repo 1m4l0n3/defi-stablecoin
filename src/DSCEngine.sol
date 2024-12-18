@@ -5,6 +5,7 @@ pragma solidity ^0.8.18;
 import {IERC20} from "../lib/openzeppelin-contracts/lib/erc4626-tests/ERC4626.prop.sol";
 import {DecentralizedStableCoin} from "./DecentralizedStableCoin.sol";
 import {ReentrancyGuard} from "../lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
+import {AggregatorV3Interface} from "../lib/chainlink-brownie-contracts/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
 
 /*
  * @title DSCEngine
@@ -37,6 +38,9 @@ contract DSCEngine is ReentrancyGuard {
     mapping(address user => mapping(address token => uint256 amount)) private s_collateralDeposited;
     DecentralizedStableCoin private immutable i_dsc;
     mapping(address user => uint256 amountDscMinted) private s_coinsMinted;
+    address[] private s_collateralTokens;
+    uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
+    uint256 private constant PRECISION = 1e18;
 
     event CollateralDeposited(address user, address tokenAddress, uint256 amount);
 
@@ -59,11 +63,17 @@ contract DSCEngine is ReentrancyGuard {
         }
         for ( uint256 index=0;index < tokenCollateralAddresses.length;index++){
             s_tokenToPriceFeeds[tokenCollateralAddresses[index]] = priceFeedAddresses[index];
+            s_collateralTokens.push(tokenCollateralAddresses[index]);
         }
         i_dsc = DecentralizedStableCoin(dscAddress);
     }
 
     // External & Public
+
+    function mintDSC(uint256 amountDSCToMint) public moreThanZero(amountDSCToMint) nonReentrant {
+        s_coinsMinted[msg.sender] += amountDSCToMint;
+    }
+
     function depositCollateral(address tokenCollateralAddress, uint256 amountCollateral) external moreThanZero(amountCollateral) isValidCollateral(tokenCollateralAddress){
         s_collateralDeposited[msg.sender][tokenCollateralAddress] = amountCollateral;
         emit CollateralDeposited(msg.sender,tokenCollateralAddress,amountCollateral);
@@ -73,9 +83,31 @@ contract DSCEngine is ReentrancyGuard {
             revert DSCEngine__TransferFailed(msg.sender,address(this),amountCollateral);
         }
     }
-    
+
+    function getUsdOfCollateral(address token, uint256 amount) public view returns(uint256){
+        AggregatorV3Interface priceFeed = AggregatorV3Interface(s_tokenToPriceFeeds[token]);
+        (,int256 price,,,) = priceFeed.latestRoundData();
+        return (uint256(price) * ADDITIONAL_FEED_PRECISION * amount / PRECISION );
+    }
+
     // Internal & Private
-    function mintDSC(uint256 amountDSCToMint) public moreThanZero(amountDSCToMint) nonReentrant {
-        s_coinsMinted[msg.sender] += amountDSCToMint;
+    function _healthFactor(address user) internal view {
+        (uint256 totalAmountMinted , uint256 totalCollateralValueInUsd) = _getAccountInformation(user);
+    }
+
+    function _getAccountInformation(address user) internal view returns(uint256,uint256){
+        uint256 totalAmountMinted = s_coinsMinted[user];
+        uint256 totalCollateralValue = getAccountCollateralValue(user);
+        return (totalAmountMinted,totalCollateralValue);
+    }
+
+    function getAccountCollateralValue(address user) internal view returns(uint256){
+        uint256 totalCollateralValueInUsd = 0;
+        for(uint256 index;index <= s_collateralTokens.length;index++){
+            address token = s_collateralTokens[index];
+            uint256 amount = s_collateralDeposited[user][token];
+            totalCollateralValueInUsd += getUsdOfCollateral(token,amount);
+        }
+        return totalCollateralValueInUsd;
     }
 }
