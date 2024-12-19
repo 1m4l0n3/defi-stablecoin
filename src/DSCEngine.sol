@@ -83,7 +83,7 @@ contract DSCEngine is ReentrancyGuard {
         }
     }
 
-    function depositCollateral(address tokenCollateralAddress, uint256 amountCollateral) external moreThanZero(amountCollateral) isValidCollateral(tokenCollateralAddress){
+    function depositCollateral(address tokenCollateralAddress, uint256 amountCollateral) public moreThanZero(amountCollateral) isValidCollateral(tokenCollateralAddress){
         s_collateralDeposited[msg.sender][tokenCollateralAddress] = amountCollateral;
         emit CollateralDeposited(msg.sender,tokenCollateralAddress,amountCollateral);
 
@@ -91,6 +91,11 @@ contract DSCEngine is ReentrancyGuard {
         if (!success) {
             revert DSCEngine__TransferFailed(msg.sender,address(this),amountCollateral);
         }
+    }
+
+    function depositCollateralAndMintDSC(address tokenCollateralAddress, uint256 amountCollateral, uint256 amountToMint) external {
+        depositCollateral(tokenCollateralAddress,amountCollateral);
+        mintDSC(amountToMint);
     }
 
     function getUsdOfCollateral(address token, uint256 amount) public view returns(uint256){
