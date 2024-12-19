@@ -35,6 +35,7 @@ contract DSCEngine is ReentrancyGuard {
     error DSCEngine__TransferFailed(address _from, address _to, uint256 _amount);
     error DSCEngine__BreaksHealthFactor(uint256 healthFactor);
     error DSCEngine__FailedToMint();
+    error DSCEngine__InsufficientCollateral(address tokenCollateralAddress, uint256 amount);
 
     mapping(address token => address priceFeed) private s_tokenToPriceFeeds;
     mapping(address user => mapping(address token => uint256 amount)) private s_collateralDeposited;
@@ -48,6 +49,7 @@ contract DSCEngine is ReentrancyGuard {
     uint256 private constant MIN_HEALTH_FACTOR = 1e18;
 
     event CollateralDeposited(address user, address tokenAddress, uint256 amount);
+    event CollateralRedeemed(address user, address tokenAddress, uint256 amount);
 
     modifier moreThanZero(uint256 amount) {
         if(amount <= 0){
@@ -102,6 +104,21 @@ contract DSCEngine is ReentrancyGuard {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(s_tokenToPriceFeeds[token]);
         (,int256 price,,,) = priceFeed.latestRoundData();
         return ( (uint256(price) * ADDITIONAL_FEED_PRECISION * amount ) / PRECISION );
+    }
+
+    function redeemCollateral(address tokenCollateralAddress, uint256 amountCollateral) external {
+        if (s_collateralDeposited[msg.sender][tokenCollateralAddress] < amountCollateral){
+            revert DSCEngine__InsufficientCollateral(tokenCollateralAddress,amountCollateral);
+        }
+        s_collateralDeposited[msg.sender][tokenCollateralAddress] -= amountCollateral;
+        emit CollateralRedeemed(msg.sender,tokenCollateralAddress,amountCollateral);
+
+        bool success = IERC20(tokenCollateralAddress).transfer(msg.sender,amountCollateral);
+        if(!success) {
+            revert DSCEngine__TransferFailed(address(this),msg.sender,amountCollateral);
+        }
+
+        _revertHealthFactorIsBroken(msg.sender);
     }
 
     // Internal & Private
