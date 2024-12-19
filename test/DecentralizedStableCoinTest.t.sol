@@ -5,18 +5,20 @@ pragma solidity ^0.8.18;
 import {Test} from "../lib/forge-std/src/Test.sol";
 import {DecentralizedStableCoinDeploy} from "../script/DecentralizedStableCoinDeploy.s.sol";
 import {DecentralizedStableCoin} from "../src/DecentralizedStableCoin.sol";
+import {DSCEngine} from "../src/DSCEngine.sol";
 import {Ownable} from "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 
 contract DecentralizedStableCoinTest is Test {
     DecentralizedStableCoinDeploy private deployer;
     DecentralizedStableCoin private stableCoin;
+    DSCEngine private dscEngine;
     address private owner;
     address private alice;
 
     function setUp() public {
         deployer = new DecentralizedStableCoinDeploy();
-        stableCoin = deployer.run();
-        owner = vm.parseAddress(vm.envString("OWNER_ADDRESS"));
+        (stableCoin, dscEngine) = deployer.run();
+        owner = address(dscEngine);
         alice = makeAddr("alice");
     }
 
