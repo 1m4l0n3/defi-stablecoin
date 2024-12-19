@@ -36,6 +36,7 @@ contract DSCEngine is ReentrancyGuard {
     error DSCEngine__BreaksHealthFactor(uint256 healthFactor);
     error DSCEngine__FailedToMint();
     error DSCEngine__InsufficientCollateral(address tokenCollateralAddress, uint256 amount);
+    error DSCEngine__InsufficientDSC(uint256 mintedCoins, uint256 coinsToBurn);
 
     mapping(address token => address priceFeed) private s_tokenToPriceFeeds;
     mapping(address user => mapping(address token => uint256 amount)) private s_collateralDeposited;
@@ -50,6 +51,7 @@ contract DSCEngine is ReentrancyGuard {
 
     event CollateralDeposited(address user, address tokenAddress, uint256 amount);
     event CollateralRedeemed(address user, address tokenAddress, uint256 amount);
+    event DSCEngine__DSCBurned(address user, uint256 amountToBurn);
 
     modifier moreThanZero(uint256 amount) {
         if(amount <= 0){
@@ -106,7 +108,7 @@ contract DSCEngine is ReentrancyGuard {
         return ( (uint256(price) * ADDITIONAL_FEED_PRECISION * amount ) / PRECISION );
     }
 
-    function redeemCollateral(address tokenCollateralAddress, uint256 amountCollateral) external {
+    function redeemCollateral(address tokenCollateralAddress, uint256 amountCollateral) public {
         if (s_collateralDeposited[msg.sender][tokenCollateralAddress] < amountCollateral){
             revert DSCEngine__InsufficientCollateral(tokenCollateralAddress,amountCollateral);
         }
@@ -119,6 +121,26 @@ contract DSCEngine is ReentrancyGuard {
         }
 
         _revertHealthFactorIsBroken(msg.sender);
+    }
+
+    function burnDsc(uint256 amountToBurn) public moreThanZero(amountToBurn) {
+        if ( s_totalAmountMinted[msg.sender] < amountToBurn){
+            revert DSCEngine__InsufficientDSC(s_totalAmountMinted[msg.sender],amountToBurn);
+        }
+        s_totalAmountMinted[msg.sender] -= amountToBurn;
+        emit DSCEngine__DSCBurned(msg.sender,amountToBurn);
+
+        bool success = i_dsc.transferFrom(msg.sender,address(this),amountToBurn);
+        if(!success){
+            revert DSCEngine__TransferFailed(msg.sender,address(this),amountToBurn);
+        }
+        i_dsc.burn(amountToBurn);
+        _revertHealthFactorIsBroken(msg.sender);
+    }
+
+    function redeemCollateralAndBurnDsc(address tokenCollateralAddress, uint256 amountCollateral,uint256 amountToBurn) external {
+        burnDsc(amountToBurn);
+        redeemCollateral(tokenCollateralAddress,amountCollateral);
     }
 
     // Internal & Private
