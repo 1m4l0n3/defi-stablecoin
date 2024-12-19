@@ -7,21 +7,29 @@ import {DecentralizedStableCoinDeploy} from "../script/DecentralizedStableCoinDe
 import {DecentralizedStableCoin} from "../src/DecentralizedStableCoin.sol";
 import {DSCEngine} from "../src/DSCEngine.sol";
 import {Ownable} from "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import {HelperConfig} from "../script/HelperConfig.s.sol";
 
 contract DecentralizedStableCoinTest is Test {
     DecentralizedStableCoinDeploy private deployer;
     DecentralizedStableCoin private stableCoin;
     DSCEngine private dscEngine;
+    HelperConfig private helperConfig;
     address private owner;
     address private alice;
+    address private weth;
+    address private ethUsdPriceFeed;
 
     function setUp() public {
         deployer = new DecentralizedStableCoinDeploy();
-        (stableCoin, dscEngine) = deployer.run();
+        (stableCoin, dscEngine, helperConfig) = deployer.run();
+        (ethUsdPriceFeed,,weth,,) = helperConfig.activeNetworkConfig();
         owner = address(dscEngine);
         alice = makeAddr("alice");
     }
 
+    /////////////////
+    // stableCoin //
+    ////////////////
     function testInitialSetupValues() view external {
         string memory coinName = "DecentralizedStableCoin";
         string memory coinSymbol = "DSC";
@@ -67,6 +75,17 @@ contract DecentralizedStableCoinTest is Test {
         vm.prank(owner);
         vm.expectRevert(DecentralizedStableCoin.DecentralizedStableCoin__CantMintWithZeroAmount.selector);
         stableCoin.mint(alice,0);
+    }
+
+    /////////////////
+    //  DscEngine //
+    ////////////////
+
+    function testEthToUsdConversion() external view {
+        uint256 ethAmount = 15e18;
+        uint256 expectedUsd = 30000e18;
+        uint256 actualUsd = dscEngine.getUsdOfCollateral(weth,ethAmount);
+        assertEq(expectedUsd,actualUsd);
     }
 
 }
