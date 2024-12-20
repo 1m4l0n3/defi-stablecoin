@@ -37,6 +37,7 @@ contract DSCEngine is ReentrancyGuard {
     error DSCEngine__FailedToMint();
     error DSCEngine__InsufficientCollateral(address tokenCollateralAddress, uint256 amount);
     error DSCEngine__InsufficientDSC(uint256 mintedCoins, uint256 coinsToBurn);
+    error DSCEngine__HealthFactorOk();
 
     mapping(address token => address priceFeed) private s_tokenToPriceFeeds;
     mapping(address user => mapping(address token => uint256 amount)) private s_collateralDeposited;
@@ -47,10 +48,11 @@ contract DSCEngine is ReentrancyGuard {
     uint256 private constant PRECISION = 1e18;
     uint256 private constant LIQUIDATION_THRESHOLD = 50;
     uint256 private constant LIQUIDATION_PRECISION = 100;
+    uint256 private constant LIQUIDATION_BONUS = 10;
     uint256 private constant MIN_HEALTH_FACTOR = 1e18;
 
     event CollateralDeposited(address user, address tokenAddress, uint256 amount);
-    event CollateralRedeemed(address user, address tokenAddress, uint256 amount);
+    event CollateralRedeemed(address user,address to, address tokenAddress, uint256 amount);
     event DSCEngine__DSCBurned(address user, uint256 amountToBurn);
 
     modifier moreThanZero(uint256 amount) {
@@ -102,39 +104,62 @@ contract DSCEngine is ReentrancyGuard {
         mintDSC(amountToMint);
     }
 
-    function getUsdOfCollateral(address token, uint256 amount) public view returns(uint256){
+    function getUsdValueOfCollateral(address token, uint256 amount) public view returns(uint256){
         AggregatorV3Interface priceFeed = AggregatorV3Interface(s_tokenToPriceFeeds[token]);
         (,int256 price,,,) = priceFeed.latestRoundData();
         return ( (uint256(price) * ADDITIONAL_FEED_PRECISION * amount ) / PRECISION );
     }
 
-    function redeemCollateral(address tokenCollateralAddress, uint256 amountCollateral) public {
-        if (s_collateralDeposited[msg.sender][tokenCollateralAddress] < amountCollateral){
-            revert DSCEngine__InsufficientCollateral(tokenCollateralAddress,amountCollateral);
-        }
-        s_collateralDeposited[msg.sender][tokenCollateralAddress] -= amountCollateral;
-        emit CollateralRedeemed(msg.sender,tokenCollateralAddress,amountCollateral);
+    function getCollateralValueOfUsd(address collateralAddress, uint256 usdAmount) public view returns(uint256)  {
+        AggregatorV3Interface priceFeed = AggregatorV3Interface(collateralAddress);
+        (,int256 price,,,) = priceFeed.latestRoundData();
+        return ((usdAmount * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION));
+    }
 
-        bool success = IERC20(tokenCollateralAddress).transfer(msg.sender,amountCollateral);
+    function liquidate(address user,address collateralAddress, uint256 debtToCover) external  {
+        uint256 startingHealthFactor = _healthFactor(user);
+        if (startingHealthFactor > MIN_HEALTH_FACTOR){
+            revert DSCEngine__HealthFactorOk();
+        }
+        uint256 collateralValueInUsd = getCollateralValueOfUsd(collateralAddress, debtToCover);
+        uint256 liquidatorBonus = ( collateralValueInUsd * LIQUIDATION_BONUS ) / LIQUIDATION_PRECISION ;
+        uint256 totalCollateralValueToRedeem = collateralValueInUsd + liquidatorBonus;
+        _redeemCollateral(user,msg.sender,collateralAddress,totalCollateralValueToRedeem);
+        
+    }
+
+    function _redeemCollateral(address from, address to, address tokenCollateralAddress, uint256 amountToRedeem) internal {
+        s_collateralDeposited[from][tokenCollateralAddress] -= amountToRedeem;
+        emit CollateralRedeemed(from,to,tokenCollateralAddress,amountToRedeem);
+
+        bool success = IERC20(tokenCollateralAddress).transfer(to,amountToRedeem);
         if(!success) {
-            revert DSCEngine__TransferFailed(address(this),msg.sender,amountCollateral);
+            revert DSCEngine__TransferFailed(address(this),msg.sender,amountToRedeem);
         }
+    }
 
+    function redeemCollateral(address tokenCollateralAddress, uint256 amountToRedeem) public {
+        if (s_collateralDeposited[msg.sender][tokenCollateralAddress] < amountToRedeem){
+            revert DSCEngine__InsufficientCollateral(tokenCollateralAddress,amountToRedeem);
+        }
+        _redeemCollateral(msg.sender,msg.sender,tokenCollateralAddress,amountToRedeem);
         _revertHealthFactorIsBroken(msg.sender);
     }
 
+    function _burnDsc(address onBehalf, address by, uint256 amountToBurn) public  {
+        s_totalAmountMinted[onBehalf] -= amountToBurn;
+        emit DSCEngine__DSCBurned(msg.sender,amountToBurn);
+        bool success = i_dsc.transferFrom(by,address(this),amountToBurn);
+        if (!success) {
+            revert DSCEngine__TransferFailed(by,address(this),amountToBurn);
+        }
+        i_dsc.burn(amountToBurn);
+    }
     function burnDsc(uint256 amountToBurn) public moreThanZero(amountToBurn) {
         if ( s_totalAmountMinted[msg.sender] < amountToBurn){
             revert DSCEngine__InsufficientDSC(s_totalAmountMinted[msg.sender],amountToBurn);
         }
-        s_totalAmountMinted[msg.sender] -= amountToBurn;
-        emit DSCEngine__DSCBurned(msg.sender,amountToBurn);
-
-        bool success = i_dsc.transferFrom(msg.sender,address(this),amountToBurn);
-        if(!success){
-            revert DSCEngine__TransferFailed(msg.sender,address(this),amountToBurn);
-        }
-        i_dsc.burn(amountToBurn);
+        _burnDsc(msg.sender,msg.sender,amountToBurn);
         _revertHealthFactorIsBroken(msg.sender);
     }
 
@@ -169,7 +194,7 @@ contract DSCEngine is ReentrancyGuard {
         for(uint256 index;index <= s_collateralTokens.length;index++){
             address token = s_collateralTokens[index];
             uint256 amount = s_collateralDeposited[user][token];
-            totalCollateralValueInUsd += getUsdOfCollateral(token,amount);
+            totalCollateralValueInUsd += getUsdValueOfCollateral(token,amount);
         }
         return totalCollateralValueInUsd;
     }

@@ -87,7 +87,7 @@ contract DecentralizedStableCoinTest is Test {
     function testEthToUsdConversion() external view {
         uint256 ethAmount = 15e18;
         uint256 expectedUsd = 30000e18;
-        uint256 actualUsd = dscEngine.getUsdOfCollateral(weth,ethAmount);
+        uint256 actualUsd = dscEngine.getUsdValueOfCollateral(weth,ethAmount);
         assertEq(expectedUsd,actualUsd);
     }
 
