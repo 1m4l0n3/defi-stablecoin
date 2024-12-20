@@ -125,7 +125,12 @@ contract DSCEngine is ReentrancyGuard {
         uint256 liquidatorBonus = ( collateralValueInUsd * LIQUIDATION_BONUS ) / LIQUIDATION_PRECISION ;
         uint256 totalCollateralValueToRedeem = collateralValueInUsd + liquidatorBonus;
         _redeemCollateral(user,msg.sender,collateralAddress,totalCollateralValueToRedeem);
-        
+        _burnDsc(user,msg.sender,debtToCover);
+        uint256 endingHealthFactor = _healthFactor(user);
+        if (endingHealthFactor <= startingHealthFactor) {
+            revert DSCEngine__HealthFactorOk();
+        }
+        _revertHealthFactorIsBroken(msg.sender);
     }
 
     function _redeemCollateral(address from, address to, address tokenCollateralAddress, uint256 amountToRedeem) internal {
