@@ -35,7 +35,7 @@ contract InvariantsTest is StdInvariant, Test {
         uint256 totalWethDeposited = IERC20(weth).balanceOf(address(this));
         uint256 totalWbtcDeposited = IERC20(wbtc).balanceOf(address(this));
 
-        uint256 usdValueOfWethDeposited = dscEngine.getUsdValueOfCollateral(weth,totalWbtcDeposited);
+        uint256 usdValueOfWethDeposited = dscEngine.getUsdValueOfCollateral(weth,totalWethDeposited);
         uint256 usdValueOfWbtcDeposited = dscEngine.getUsdValueOfCollateral(wbtc,totalWbtcDeposited);
 
         assert(usdValueOfWethDeposited + usdValueOfWbtcDeposited >= totalSupply);

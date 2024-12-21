@@ -35,7 +35,7 @@ contract DSCEngine is ReentrancyGuard {
     error DSCEngine__TransferFailed(address _from, address _to, uint256 _amount);
     error DSCEngine__BreaksHealthFactor(uint256 healthFactor);
     error DSCEngine__FailedToMint();
-    error DSCEngine__InsufficientCollateralToRedeem(address tokenCollateralAddress, uint256 amount);
+    error DSCEngine__InsufficientCollateralToRedeem(address user, address tokenCollateralAddress, uint256 amount);
     error DSCEngine__InsufficientDSCToBurn(uint256 mintedCoins, uint256 coinsToBurn);
     error DSCEngine__HealthFactorOk();
 
@@ -137,7 +137,7 @@ contract DSCEngine is ReentrancyGuard {
 
     function redeemCollateral(address tokenCollateralAddress, uint256 amountToRedeem) public {
         if (s_collateralDeposited[msg.sender][tokenCollateralAddress] < amountToRedeem){
-            revert DSCEngine__InsufficientCollateralToRedeem(tokenCollateralAddress,amountToRedeem);
+            revert DSCEngine__InsufficientCollateralToRedeem(msg.sender, tokenCollateralAddress,amountToRedeem);
         }
         _redeemCollateral(msg.sender,msg.sender,tokenCollateralAddress,amountToRedeem);
         _revertHealthFactorIsBroken(msg.sender);
@@ -157,9 +157,9 @@ contract DSCEngine is ReentrancyGuard {
 
     function getAccountCollateralValueIsUsd(address user) public view returns(uint256){
         uint256 totalCollateralValueInUsd = 0;
-        for(uint256 index;index <= s_collateralTokens.length;index++){
+        for(uint256 index;index < s_collateralTokens.length;index++){
             address token = s_collateralTokens[index];
-        uint256 amount = s_collateralDeposited[user][token];
+            uint256 amount = s_collateralDeposited[user][token];
             totalCollateralValueInUsd += getUsdValueOfCollateral(token,amount);
         }
         return totalCollateralValueInUsd;
@@ -213,5 +213,9 @@ contract DSCEngine is ReentrancyGuard {
     // View / Pure
     function getTokenCollateralAddresses() public view returns(address [] memory tokenCollateralAddresses){
         return s_collateralTokens;
+    }
+
+    function getCollateralValueOfUser(address tokenCollateralAddress, address user) public view returns(uint256){
+        return s_collateralDeposited[user][tokenCollateralAddress];
     }
 }

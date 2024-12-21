@@ -8,7 +8,6 @@ import {DecentralizedStableCoin} from "../../src/DecentralizedStableCoin.sol";
 import {DSCEngine} from "../../src/DSCEngine.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {ERC20Mock} from "../mocks/ERC20Mock.sol";
-import { console } from "forge-std/console.sol";
 
 contract Handler is Test {
     DSCEngine private dscEngine;
@@ -38,9 +37,18 @@ contract Handler is Test {
         vm.stopPrank();
     }
 
+    function redeemCollateral(uint256 tokenCollateralAddressSeed, uint256 collateralAmount) public {
+        address tokenCollateralAddress = _getTokenCollateralAddress(tokenCollateralAddressSeed);
+        uint256 totalUserCollateral = dscEngine.getCollateralValueOfUser(tokenCollateralAddress,msg.sender);
+        collateralAmount = bound(collateralAmount,0,totalUserCollateral);
+        if (collateralAmount == 0) return;
+        vm.prank(msg.sender);
+        dscEngine.redeemCollateral(tokenCollateralAddress,collateralAmount);
+    }
+
     // Internal
     function _getTokenCollateralAddress(uint256 tokenCollateralAddressSeed) internal view returns(address tokenCollateralAddress){
-        uint256 index = tokenCollateralAddresses.length % 2;
+        uint256 index = tokenCollateralAddressSeed % 2;
         return tokenCollateralAddresses[index];
     }
 }
