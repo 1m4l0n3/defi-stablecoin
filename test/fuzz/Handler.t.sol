@@ -8,6 +8,7 @@ import {DecentralizedStableCoin} from "../../src/DecentralizedStableCoin.sol";
 import {DSCEngine} from "../../src/DSCEngine.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {ERC20Mock} from "../mocks/ERC20Mock.sol";
+import { console } from "forge-std/console.sol";
 
 contract Handler is Test {
     DSCEngine private dscEngine;
@@ -37,13 +38,30 @@ contract Handler is Test {
         vm.stopPrank();
     }
 
-    function redeemCollateral(uint256 tokenCollateralAddressSeed, uint256 collateralAmount) public {
+    function redeemCollateral(uint256 tokenCollateralAddressSeed, uint256 collateralToRedeem) public {
         address tokenCollateralAddress = _getTokenCollateralAddress(tokenCollateralAddressSeed);
-        uint256 totalUserCollateral = dscEngine.getCollateralValueOfUser(tokenCollateralAddress,msg.sender);
-        collateralAmount = bound(collateralAmount,0,totalUserCollateral);
-        if (collateralAmount == 0) return;
+        uint256 totalTokenCollateralOfUser = dscEngine.getCollateralValueOfUser(tokenCollateralAddress,msg.sender);
+        uint256 totalTokenCollateralOfUserInUsd = dscEngine.getUsdValueOfCollateral(tokenCollateralAddress,totalTokenCollateralOfUser);
+        (uint256 totalAmountMinted , uint256 totalCollateralValue) = dscEngine.getAccountInformation(msg.sender);
+
+        uint256 maxAmountToMint = ( ( totalCollateralValue * dscEngine.LIQUIDATION_THRESHOLD() ) / dscEngine.LIQUIDATION_PRECISION() ) - totalAmountMinted;
+        uint256 maxAmountToRedeem = maxAmountToMint > totalTokenCollateralOfUserInUsd ? totalTokenCollateralOfUserInUsd : maxAmountToMint;
+        uint256 maxCollateralToRedeem = dscEngine.getCollateralValueOfUsd(tokenCollateralAddress,maxAmountToRedeem);
+        collateralToRedeem = bound(collateralToRedeem,0,maxCollateralToRedeem);
+        if (collateralToRedeem == 0) return;
+
         vm.prank(msg.sender);
-        dscEngine.redeemCollateral(tokenCollateralAddress,collateralAmount);
+        dscEngine.redeemCollateral(tokenCollateralAddress,collateralToRedeem);
+    }
+
+    function mintDSC(uint256 amountToMint) public {
+        (uint256 totalAmountMinted , uint256 totalCollateralValue) = dscEngine.getAccountInformation(msg.sender);
+        uint256 maxAmountToMint = ( ( totalCollateralValue * dscEngine.LIQUIDATION_THRESHOLD() ) / dscEngine.LIQUIDATION_PRECISION() ) - totalAmountMinted;
+        amountToMint = bound(amountToMint,0,maxAmountToMint);
+        if (amountToMint == 0) return;
+        vm.startPrank(msg.sender);
+        dscEngine.mintDSC(amountToMint);
+        vm.stopPrank();
     }
 
     // Internal

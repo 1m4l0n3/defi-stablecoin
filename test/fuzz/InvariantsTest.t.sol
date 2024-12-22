@@ -32,8 +32,8 @@ contract InvariantsTest is StdInvariant, Test {
 
     function invariant_protocolShouldHaveMoreValueThenTotalSupply() public view  {
         uint256 totalSupply = stableCoin.totalSupply();
-        uint256 totalWethDeposited = IERC20(weth).balanceOf(address(this));
-        uint256 totalWbtcDeposited = IERC20(wbtc).balanceOf(address(this));
+        uint256 totalWethDeposited = IERC20(weth).balanceOf(address(dscEngine));
+        uint256 totalWbtcDeposited = IERC20(wbtc).balanceOf(address(dscEngine));
 
         uint256 usdValueOfWethDeposited = dscEngine.getUsdValueOfCollateral(weth,totalWethDeposited);
         uint256 usdValueOfWbtcDeposited = dscEngine.getUsdValueOfCollateral(wbtc,totalWbtcDeposited);
