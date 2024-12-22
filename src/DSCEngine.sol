@@ -46,8 +46,8 @@ contract DSCEngine is ReentrancyGuard {
     DecentralizedStableCoin private immutable i_dsc;
     uint256 private constant ADDITIONAL_FEED_PRECISION = 1e10;
     uint256 private constant PRECISION = 1e18;
-    uint256 private constant LIQUIDATION_THRESHOLD = 50;
-    uint256 private constant LIQUIDATION_PRECISION = 100;
+    uint256 public constant LIQUIDATION_THRESHOLD = 50;
+    uint256 public constant LIQUIDATION_PRECISION = 100;
     uint256 private constant LIQUIDATION_BONUS = 10;
     uint256 private constant MIN_HEALTH_FACTOR = 1e18;
 
@@ -143,28 +143,6 @@ contract DSCEngine is ReentrancyGuard {
         _revertHealthFactorIsBroken(msg.sender);
     }
 
-    function getUsdValueOfCollateral(address token, uint256 CollateralAmount) public view returns(uint256){
-        AggregatorV3Interface priceFeed = AggregatorV3Interface(s_tokenToPriceFeeds[token]);
-        (,int256 price,,,) = priceFeed.latestRoundData();
-        return ( (uint256(price) * ADDITIONAL_FEED_PRECISION * CollateralAmount ) / PRECISION );
-    }
-
-    function getCollateralValueOfUsd(address tokenCollateralAddress, uint256 usdAmount) public view returns(uint256)  {
-        AggregatorV3Interface priceFeed = AggregatorV3Interface(tokenCollateralAddress);
-        (,int256 price,,,) = priceFeed.latestRoundData();
-        return ((usdAmount * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION));
-    }
-
-    function getAccountCollateralValueIsUsd(address user) public view returns(uint256){
-        uint256 totalCollateralValueInUsd = 0;
-        for(uint256 index;index < s_collateralTokens.length;index++){
-            address token = s_collateralTokens[index];
-            uint256 amount = s_collateralDeposited[user][token];
-            totalCollateralValueInUsd += getUsdValueOfCollateral(token,amount);
-        }
-        return totalCollateralValueInUsd;
-    }
-
 
     // Internal
     function _redeemCollateral(address from, address to, address tokenCollateralAddress, uint256 amountToRedeem) internal {
@@ -211,11 +189,37 @@ contract DSCEngine is ReentrancyGuard {
     }
 
     // View / Pure
+    function getUsdValueOfCollateral(address tokenCollateralAddress, uint256 CollateralAmount) public view returns(uint256){
+        AggregatorV3Interface priceFeed = AggregatorV3Interface(s_tokenToPriceFeeds[tokenCollateralAddress]);
+        (,int256 price,,,) = priceFeed.latestRoundData();
+        return ( (uint256(price) * ADDITIONAL_FEED_PRECISION * CollateralAmount ) / PRECISION );
+    }
+
+    function getCollateralValueOfUsd(address tokenCollateralAddress, uint256 usdAmount) public view returns(uint256)  {
+        AggregatorV3Interface priceFeed = AggregatorV3Interface(s_tokenToPriceFeeds[tokenCollateralAddress]);
+        (,int256 price,,,) = priceFeed.latestRoundData();
+        return ((usdAmount * PRECISION) / (uint256(price) * ADDITIONAL_FEED_PRECISION));
+    }
+
+    function getAccountCollateralValueIsUsd(address user) public view returns(uint256){
+        uint256 totalCollateralValueInUsd = 0;
+        for(uint256 index;index < s_collateralTokens.length;index++){
+            address token = s_collateralTokens[index];
+            uint256 amount = s_collateralDeposited[user][token];
+            totalCollateralValueInUsd += getUsdValueOfCollateral(token,amount);
+        }
+        return totalCollateralValueInUsd;
+    }
+
     function getTokenCollateralAddresses() public view returns(address [] memory tokenCollateralAddresses){
         return s_collateralTokens;
     }
 
     function getCollateralValueOfUser(address tokenCollateralAddress, address user) public view returns(uint256){
         return s_collateralDeposited[user][tokenCollateralAddress];
+    }
+
+    function getAccountInformation(address user) public view returns(uint256, uint256){
+        return _getAccountInformation(user);
     }
 }
