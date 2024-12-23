@@ -6,6 +6,7 @@ import {IERC20} from "../lib/openzeppelin-contracts/lib/erc4626-tests/ERC4626.pr
 import {DecentralizedStableCoin} from "./DecentralizedStableCoin.sol";
 import {ReentrancyGuard} from "../lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 import {AggregatorV3Interface} from "../lib/chainlink-brownie-contracts/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+import {OracleLib} from "./libraries/OracleLib.sol";
 
 /*
  * @title DSCEngine
@@ -38,6 +39,8 @@ contract DSCEngine is ReentrancyGuard {
     error DSCEngine__InsufficientCollateralToRedeem(address user, address tokenCollateralAddress, uint256 amount);
     error DSCEngine__InsufficientDSCToBurn(uint256 mintedCoins, uint256 coinsToBurn);
     error DSCEngine__HealthFactorOk();
+
+    using OracleLib for AggregatorV3Interface;
 
     mapping(address token => address priceFeed) private s_tokenToPriceFeeds;
     mapping(address user => mapping(address token => uint256 amount)) private s_collateralDeposited;
